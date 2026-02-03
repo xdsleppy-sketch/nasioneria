@@ -71,12 +71,20 @@
         <h2>Sklep</h2>
         <p>Przykładowe produkty — po zalogowaniu możesz kupować.</p>
       </div>
+      <div class="coupon">
+        <label>
+          Kod rabatowy
+          <input id="couponInput" type="text" placeholder="Wpisz kod (np. START)" />
+        </label>
+        <button class="btn" id="applyCoupon" type="button">Zastosuj</button>
+        <p class="status" id="couponStatus" aria-live="polite"></p>
+      </div>
       <div class="grid">
         <article class="card">
-          <h3>VIP</h3>
+          <h3 class="rank-title"><span class="rank-badge rank-vip">VIP</span></h3>
           <p class="price">
-            <span class="price-line">30 dni: 6 zł</span>
-            <span class="price-line">Na zawsze: 12 zł</span>
+            <span class="price-line" data-price="6">30 dni: 6 zł</span>
+            <span class="price-line" data-price="12">Na zawsze: 12 zł</span>
           </p>
           <ul>
             <li>Ranga VIP na serwerze</li>
@@ -85,10 +93,10 @@
           <button class="btn" type="button">Dodaj do koszyka</button>
         </article>
         <article class="card">
-          <h3>SVIP</h3>
+          <h3 class="rank-title"><span class="rank-badge rank-svip">SVIP</span></h3>
           <p class="price">
-            <span class="price-line">30 dni: 13 zł</span>
-            <span class="price-line">Na zawsze: 27 zł</span>
+            <span class="price-line" data-price="13">30 dni: 13 zł</span>
+            <span class="price-line" data-price="27">Na zawsze: 27 zł</span>
           </p>
           <ul>
             <li>Ranga SVIP</li>
@@ -97,10 +105,10 @@
           <button class="btn" type="button">Dodaj do koszyka</button>
         </article>
         <article class="card">
-          <h3>GVIP</h3>
+          <h3 class="rank-title"><span class="rank-badge rank-gvip">GVIP</span></h3>
           <p class="price">
-            <span class="price-line">30 dni: 20 zł</span>
-            <span class="price-line">Na zawsze: 30 zł</span>
+            <span class="price-line" data-price="20">30 dni: 20 zł</span>
+            <span class="price-line" data-price="30">Na zawsze: 30 zł</span>
           </p>
           <ul>
             <li>Ranga GVIP</li>
@@ -109,10 +117,10 @@
           <button class="btn" type="button">Dodaj do koszyka</button>
         </article>
         <article class="card">
-          <h3>Sponsor</h3>
+          <h3 class="rank-title"><span class="rank-badge rank-sponsor">SPONSOR</span></h3>
           <p class="price">
-            <span class="price-line">30 dni: 28 zł</span>
-            <span class="price-line">Na zawsze: 42 zł</span>
+            <span class="price-line" data-price="28">30 dni: 28 zł</span>
+            <span class="price-line" data-price="42">Na zawsze: 42 zł</span>
           </p>
           <ul>
             <li>Ranga Sponsor</li>
@@ -121,10 +129,10 @@
           <button class="btn" type="button">Dodaj do koszyka</button>
         </article>
         <article class="card">
-          <h3>Elita</h3>
+          <h3 class="rank-title"><span class="rank-badge rank-elita">ELITA</span></h3>
           <p class="price">
-            <span class="price-line">30 dni: 37 zł</span>
-            <span class="price-line">Na zawsze: 50 zł</span>
+            <span class="price-line" data-price="37">30 dni: 37 zł</span>
+            <span class="price-line" data-price="50">Na zawsze: 50 zł</span>
           </p>
           <ul>
             <li>Ranga Elita</li>
@@ -133,10 +141,10 @@
           <button class="btn" type="button">Dodaj do koszyka</button>
         </article>
         <article class="card">
-          <h3>Boss</h3>
+          <h3 class="rank-title"><span class="rank-badge rank-boss">BOSS</span></h3>
           <p class="price">
-            <span class="price-line">30 dni: 100 zł</span>
-            <span class="price-line">Na zawsze: 150 zł</span>
+            <span class="price-line" data-price="100">30 dni: 100 zł</span>
+            <span class="price-line" data-price="150">Na zawsze: 150 zł</span>
           </p>
           <ul>
             <li>Ranga Boss</li>
@@ -177,6 +185,50 @@
   </footer>
 
   <script>
+    const couponInput = document.getElementById("couponInput");
+    const applyCoupon = document.getElementById("applyCoupon");
+    const couponStatus = document.getElementById("couponStatus");
+
+    function formatPrice(value) {
+      return `${value.toFixed(2).replace(".00", "")} zł`;
+    }
+
+    function applyDiscount(percent) {
+      document.querySelectorAll(".price-line[data-price]").forEach((line) => {
+        const base = Number(line.getAttribute("data-price"));
+        const discounted = base * (1 - percent / 100);
+        const label = line.textContent.split(":")[0];
+        line.textContent = `${label}: ${formatPrice(discounted)}`;
+      });
+    }
+
+    const couponUsedKey = "couponUsed_START";
+
+    function lockCoupon() {
+      couponInput.setAttribute("disabled", "");
+      applyCoupon.setAttribute("disabled", "");
+    }
+
+    if (localStorage.getItem(couponUsedKey) === "true") {
+      applyDiscount(10);
+      couponStatus.textContent = "Kod już wykorzystany.";
+      couponStatus.className = "status success";
+      lockCoupon();
+    }
+
+    applyCoupon?.addEventListener("click", () => {
+      const code = (couponInput?.value || "").trim().toUpperCase();
+      if (code === "START") {
+        applyDiscount(10);
+        localStorage.setItem(couponUsedKey, "true");
+        couponStatus.textContent = "Kod zastosowany: -10%";
+        couponStatus.className = "status success";
+        lockCoupon();
+      } else {
+        couponStatus.textContent = "Nieprawidłowy kod.";
+        couponStatus.className = "status error";
+      }
+    });
     const authGuest = document.querySelector(".auth-guest");
     const authUser = document.querySelector(".auth-user");
     const userNick = document.querySelector(".user-nick");

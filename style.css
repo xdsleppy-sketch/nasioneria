@@ -251,6 +251,32 @@ main {
   grid-template-columns: repeat(3, minmax(240px, 1fr));
 }
 
+.coupon {
+  background: var(--card);
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  padding: 16px;
+  max-width: 520px;
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.coupon label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.coupon input {
+  background: #0f1418;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 15px;
+}
+
 .card {
   background: var(--card);
   border-radius: 18px;
@@ -260,6 +286,53 @@ main {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.rank-title {
+  margin: 0;
+}
+
+.rank-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35), inset 0 0 0 2px rgba(0, 0, 0, 0.25);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+.rank-vip {
+  background: linear-gradient(180deg, #ffe08a, #ffb300);
+  color: #3b1d00;
+}
+
+.rank-svip {
+  background: linear-gradient(180deg, #ffd7ef, #ffb3dd);
+  color: #3b0d2a;
+}
+
+.rank-gvip {
+  background: linear-gradient(180deg, #bfe9ff, #7cc7ff);
+  color: #062238;
+}
+
+.rank-sponsor {
+  background: linear-gradient(180deg, #7aa8ff, #4f7bff);
+  color: #061228;
+}
+
+.rank-elita {
+  background: linear-gradient(180deg, #c9a7ff, #8b5cf6);
+  color: #16052f;
+}
+
+.rank-boss {
+  background: linear-gradient(180deg, #9f7bff, #6d28d9);
+  color: #13012a;
 }
 
 .card .price {
