@@ -49,14 +49,10 @@
     <section id="logowanie" class="section">
       <div class="section-header">
         <h2>Logowanie</h2>
-        <p>Podaj swój nick, hasło i email, aby zalogować się do sklepu.</p>
+        <p>Podaj email, hasło i kod 2FA, aby zalogować się do sklepu.</p>
       </div>
       <p class="fine auth-message" id="authMessage" hidden></p>
       <form id="loginForm" class="form" autocomplete="on">
-        <label>
-          Nick
-          <input type="text" name="nick" placeholder="Twój nick" required />
-        </label>
         <label>
           Hasło
           <input type="password" name="password" placeholder="••••••••" required />
@@ -64,6 +60,10 @@
         <label>
           Email
           <input type="email" name="email" placeholder="email@domena.pl" required />
+        </label>
+        <label>
+          Kod 2FA
+          <input type="text" name="token2FA" placeholder="6-cyfrowy kod" inputmode="numeric" autocomplete="one-time-code" required />
         </label>
         <button class="btn" type="submit">Zaloguj się</button>
         <a class="fine" href="reset.html">Zapomniałem hasło</a>
@@ -124,6 +124,7 @@
       const payload = {
         email: form.get("email"),
         password: form.get("password"),
+        token2FA: form.get("token2FA"),
       };
 
       try {
@@ -136,7 +137,7 @@
         loginStatus.textContent = data.message || "Zalogowano.";
         loginStatus.className = res.ok ? "status success" : "status error";
         if (res.ok) {
-          const nick = data.nick || form.get("nick") || payload.email;
+          const nick = data.nick || payload.email;
           localStorage.setItem("authUser", JSON.stringify({ nick, email: payload.email }));
           updateAuthUi();
         }
