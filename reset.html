@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nasioneria — Reset hasła</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">
+        <img src="logo.png" alt="Logo serwera Nasioneria" />
+      </div>
+      <div>
+        <h1>Nasioneria</h1>
+        <p>Sklep dla społeczności serwera</p>
+      </div>
+    </div>
+    <nav class="actions">
+      <div class="menu">
+        <button class="btn ghost menu-trigger" type="button">Strona główna</button>
+        <div class="menu-dropdown">
+          <a href="index.html#sklep">Sklep</a>
+          <a href="index.html#kontakt">Kontakt</a>
+          <a href="index.html#social-media">Social media</a>
+        </div>
+      </div>
+      <a class="btn ghost" href="login.html">Logowanie</a>
+      <a class="btn" href="index.html">Strona główna</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="section">
+      <div class="section-header">
+        <h2>Reset hasła</h2>
+        <p>Podaj e‑mail, a wyślemy link do zmiany hasła.</p>
+      </div>
+      <form id="forgotForm" class="form" autocomplete="on">
+        <label>
+          Email
+          <input type="email" name="email" placeholder="email@domena.pl" required />
+        </label>
+        <button class="btn" type="submit">Wyślij link resetu</button>
+        <p class="status" id="forgotStatus" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="section" id="resetSection" hidden>
+      <div class="section-header">
+        <h2>Ustaw nowe hasło</h2>
+        <p>Wpisz nowe hasło, aby dokończyć reset.</p>
+      </div>
+      <form id="resetForm" class="form" autocomplete="on">
+        <label>
+          Nowe hasło
+          <input type="password" name="password" placeholder="Nowe hasło" required />
+        </label>
+        <label>
+          Powtórz hasło
+          <input type="password" name="passwordRepeat" placeholder="Powtórz hasło" required />
+        </label>
+        <button class="btn" type="submit">Zmień hasło</button>
+        <p class="status" id="resetStatus" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>© 2026 Nasioneria — wszystkie prawa zastrzeżone.</p>
+  </footer>
+
+  <script>
+    const forgotForm = document.getElementById("forgotForm");
+    const forgotStatus = document.getElementById("forgotStatus");
+    const resetForm = document.getElementById("resetForm");
+    const resetStatus = document.getElementById("resetStatus");
+    const resetSection = document.getElementById("resetSection");
+
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if (token) {
+      resetSection.hidden = false;
+    }
+
+    forgotForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      forgotStatus.textContent = "";
+
+      const form = new FormData(forgotForm);
+      const payload = { email: form.get("email") };
+
+      try {
+        const res = await fetch("/api/forgot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        forgotStatus.textContent = data.message || "Wysłano link resetu.";
+        forgotStatus.className = res.ok ? "status success" : "status error";
+      } catch {
+        forgotStatus.textContent = "Błąd połączenia z serwerem.";
+        forgotStatus.className = "status error";
+      }
+    });
+
+    resetForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      resetStatus.textContent = "";
+
+      const form = new FormData(resetForm);
+      const password = form.get("password");
+      const repeat = form.get("passwordRepeat");
+
+      if (password !== repeat) {
+        resetStatus.textContent = "Hasło nie jest takie samo.";
+        resetStatus.className = "status error";
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, password }),
+        });
+        const data = await res.json();
+        resetStatus.textContent = data.message || "Hasło zmienione.";
+        resetStatus.className = res.ok ? "status success" : "status error";
+      } catch {
+        resetStatus.textContent = "Błąd połączenia z serwerem.";
+        resetStatus.className = "status error";
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nasioneria — Sklep</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">
+        <img src="logo.png" alt="Logo serwera Nasioneria" />
+      </div>
+      <div>
+        <h1>Nasioneria</h1>
+        <p>Sklep dla społeczności serwera</p>
+      </div>
+    </div>
+    <nav class="actions">
+      <div class="menu">
+        <button class="btn ghost menu-trigger" type="button">Strona główna</button>
+        <div class="menu-dropdown">
+          <a href="index.html#sklep">Sklep</a>
+          <a href="index.html#kontakt">Kontakt</a>
+          <a href="index.html#social-media">Social media</a>
+          <a href="regulamin.html">Regulamin</a>
+        </div>
+      </div>
+      <div class="auth-guest">
+        <a class="btn ghost" href="register.html">Rejestracja</a>
+        <a class="btn" href="login.html">Zaloguj się</a>
+      </div>
+      <div class="auth-user" hidden>
+        <div class="menu">
+          <button class="btn ghost user-pill menu-trigger" type="button"><span class="user-nick"></span></button>
+          <div class="menu-dropdown">
+            <a href="settings.html">Ustawienia</a>
+            <a href="settings.html#2fa">Weryfikacja 2‑etapowa</a>
+            <a href="reset.html">Zmień hasło</a>
+            <a href="ranks.html">Zakupione rangi</a>
+            <a href="regulamin.html">Regulamin</a>
+            <button class="menu-action logout-btn" type="button">Wyloguj się</button>
+          </div>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-text">
+        <h2>Witaj w sklepie serwera Nasioneria</h2>
+        <p>Wybierz pakiety i gadżety dostępne dla członków. Zaloguj się, aby złożyć zamówienie.</p>
+        <div class="hero-cta">
+          <a class="btn" href="#sklep">Przeglądaj sklep</a>
+        </div>
+      </div>
+      <div class="hero-card">
+        <h3>Korzyści</h3>
+        <ul>
+          <li>Ekskluzywne role na serwerze</li>
+          <li>Dostęp do prywatnych kanałów</li>
+          <li>Okazjonalne kody rabatowe</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="sklep" class="section">
+      <div class="section-header">
+        <h2>Sklep</h2>
+        <p>Przykładowe produkty — po zalogowaniu możesz kupować.</p>
+      </div>
+      <div class="grid">
+        <article class="card">
+          <h3>VIP</h3>
+          <p class="price">
+            <span class="price-line">30 dni: 6 zł</span>
+            <span class="price-line">Na zawsze: 12 zł</span>
+          </p>
+          <ul>
+            <li>Ranga VIP na serwerze</li>
+            <li>Podstawowe bonusy</li>
+          </ul>
+          <button class="btn" type="button">Dodaj do koszyka</button>
+        </article>
+        <article class="card">
+          <h3>SVIP</h3>
+          <p class="price">
+            <span class="price-line">30 dni: 13 zł</span>
+            <span class="price-line">Na zawsze: 27 zł</span>
+          </p>
+          <ul>
+            <li>Ranga SVIP</li>
+            <li>Dodatkowe bonusy</li>
+          </ul>
+          <button class="btn" type="button">Dodaj do koszyka</button>
+        </article>
+        <article class="card">
+          <h3>GVIP</h3>
+          <p class="price">
+            <span class="price-line">30 dni: 20 zł</span>
+            <span class="price-line">Na zawsze: 30 zł</span>
+          </p>
+          <ul>
+            <li>Ranga GVIP</li>
+            <li>Więcej komend i bonusów</li>
+          </ul>
+          <button class="btn" type="button">Dodaj do koszyka</button>
+        </article>
+        <article class="card">
+          <h3>Sponsor</h3>
+          <p class="price">
+            <span class="price-line">30 dni: 28 zł</span>
+            <span class="price-line">Na zawsze: 42 zł</span>
+          </p>
+          <ul>
+            <li>Ranga Sponsor</li>
+            <li>Bonusy eventowe</li>
+          </ul>
+          <button class="btn" type="button">Dodaj do koszyka</button>
+        </article>
+        <article class="card">
+          <h3>Elita</h3>
+          <p class="price">
+            <span class="price-line">30 dni: 37 zł</span>
+            <span class="price-line">Na zawsze: 50 zł</span>
+          </p>
+          <ul>
+            <li>Ranga Elita</li>
+            <li>Priorytetowy dostęp</li>
+          </ul>
+          <button class="btn" type="button">Dodaj do koszyka</button>
+        </article>
+        <article class="card">
+          <h3>Boss</h3>
+          <p class="price">
+            <span class="price-line">30 dni: 100 zł</span>
+            <span class="price-line">Na zawsze: 150 zł</span>
+          </p>
+          <ul>
+            <li>Ranga Boss</li>
+            <li>Najwyższe bonusy</li>
+          </ul>
+          <button class="btn" type="button">Dodaj do koszyka</button>
+        </article>
+      </div>
+    </section>
+
+
+  </main>
+
+  <footer class="footer" id="kontakt">
+    <div class="footer-grid">
+      <div>
+        <h4>Nasioneria</h4>
+        <p>Serwer Minecraft dla społeczności z pakietami i rangami. Wpadaj na eventy i wspieraj rozwój.</p>
+      </div>
+      <div>
+        <h4>Kontakt</h4>
+        <ul>
+          <li>Email: kontakt_nasioneria@wp.pl</li>
+        </ul>
+        <p class="contact-note">Jeżeli nie odpiszemy w ciągu 48 godz, zrób ticket o kategorii „inne”.</p>
+      </div>
+      <div>
+        <h4 id="social-media">Social media</h4>
+        <div class="footer-social">
+          <a class="btn ghost" href="https://dsc.gg/nasioneria" target="_blank" rel="noopener noreferrer">Discord</a>
+          <a class="btn ghost" href="#">YouTube</a>
+          <a class="btn ghost" href="#">TikTok</a>
+          <a class="btn ghost" href="#">Instagram</a>
+        </div>
+      </div>
+    </div>
+    <p>© 2026 Nasioneria — wszystkie prawa zastrzeżone.</p>
+  </footer>
+
+  <script>
+    const authGuest = document.querySelector(".auth-guest");
+    const authUser = document.querySelector(".auth-user");
+    const userNick = document.querySelector(".user-nick");
+    const logoutBtn = document.querySelector(".logout-btn");
+
+    function getAuthUser() {
+      try {
+        return JSON.parse(localStorage.getItem("authUser") || "null");
+      } catch {
+        return null;
+      }
+    }
+
+    function updateAuthUi() {
+      const user = getAuthUser();
+      if (user) {
+        authGuest?.setAttribute("hidden", "");
+        authUser?.removeAttribute("hidden");
+        userNick.textContent = user.nick || user.email || "Użytkownik";
+      } else {
+        authUser?.setAttribute("hidden", "");
+        authGuest?.removeAttribute("hidden");
+      }
+    }
+
+    logoutBtn?.addEventListener("click", () => {
+      localStorage.removeItem("authUser");
+      updateAuthUi();
+    });
+
+    updateAuthUi();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nasioneria — Logowanie</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">
+        <img src="logo.png" alt="Logo serwera Nasioneria" />
+      </div>
+      <div>
+        <h1>Nasioneria</h1>
+        <p>Sklep dla społeczności serwera</p>
+      </div>
+    </div>
+    <nav class="actions">
+      <div class="menu">
+        <button class="btn ghost menu-trigger" type="button">Strona główna</button>
+        <div class="menu-dropdown">
+          <a href="index.html#sklep">Sklep</a>
+          <a href="index.html#kontakt">Kontakt</a>
+          <a href="index.html#social-media">Social media</a>
+        </div>
+      </div>
+      <div class="auth-guest">
+        <a class="btn ghost" href="register.html">Rejestracja</a>
+        <a class="btn" href="index.html">Strona główna</a>
+      </div>
+      <div class="auth-user" hidden>
+        <div class="menu">
+          <button class="btn ghost user-pill menu-trigger" type="button"><span class="user-nick"></span></button>
+          <div class="menu-dropdown">
+            <a href="settings.html">Ustawienia</a>
+            <a href="settings.html#2fa">Weryfikacja 2‑etapowa</a>
+            <a href="reset.html">Zmień hasło</a>
+            <a href="ranks.html">Zakupione rangi</a>
+            <button class="menu-action logout-btn" type="button">Wyloguj się</button>
+          </div>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section id="logowanie" class="section">
+      <div class="section-header">
+        <h2>Logowanie</h2>
+        <p>Podaj swój nick, hasło i email, aby zalogować się do sklepu.</p>
+      </div>
+      <p class="fine auth-message" id="authMessage" hidden></p>
+      <form id="loginForm" class="form" autocomplete="on">
+        <label>
+          Nick
+          <input type="text" name="nick" placeholder="Twój nick" required />
+        </label>
+        <label>
+          Hasło
+          <input type="password" name="password" placeholder="••••••••" required />
+        </label>
+        <label>
+          Email
+          <input type="email" name="email" placeholder="email@domena.pl" required />
+        </label>
+        <button class="btn" type="submit">Zaloguj się</button>
+        <a class="fine" href="reset.html">Zapomniałem hasło</a>
+        <p class="fine">Po zalogowaniu zobaczysz potwierdzenie.</p>
+        <p class="status" id="loginStatus" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>© 2026 Nasioneria — wszystkie prawa zastrzeżone.</p>
+  </footer>
+
+  <script>
+    const loginForm = document.getElementById("loginForm");
+    const loginStatus = document.getElementById("loginStatus");
+    const authGuest = document.querySelector(".auth-guest");
+    const authUser = document.querySelector(".auth-user");
+    const userNick = document.querySelector(".user-nick");
+    const logoutBtn = document.querySelector(".logout-btn");
+    const authMessage = document.getElementById("authMessage");
+
+    function getAuthUser() {
+      try {
+        return JSON.parse(localStorage.getItem("authUser") || "null");
+      } catch {
+        return null;
+      }
+    }
+
+    function updateAuthUi() {
+      const user = getAuthUser();
+      if (user) {
+        authGuest?.setAttribute("hidden", "");
+        authUser?.removeAttribute("hidden");
+        userNick.textContent = user.nick || user.email || "Użytkownik";
+        authMessage.textContent = `Jesteś zalogowany jako ${user.nick || user.email}.`;
+        authMessage.removeAttribute("hidden");
+        loginForm.setAttribute("hidden", "");
+      } else {
+        authUser?.setAttribute("hidden", "");
+        authGuest?.removeAttribute("hidden");
+        authMessage.setAttribute("hidden", "");
+        loginForm.removeAttribute("hidden");
+      }
+    }
+
+    logoutBtn?.addEventListener("click", () => {
+      localStorage.removeItem("authUser");
+      updateAuthUi();
+    });
+
+    loginForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      loginStatus.textContent = "";
+
+      const form = new FormData(loginForm);
+      const payload = {
+        email: form.get("email"),
+        password: form.get("password"),
+      };
+
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        loginStatus.textContent = data.message || "Zalogowano.";
+        loginStatus.className = res.ok ? "status success" : "status error";
+        if (res.ok) {
+          const nick = data.nick || form.get("nick") || payload.email;
+          localStorage.setItem("authUser", JSON.stringify({ nick, email: payload.email }));
+          updateAuthUi();
+        }
+      } catch {
+        loginStatus.textContent = "Błąd połączenia z serwerem.";
+        loginStatus.className = "status error";
+      }
+    });
+
+    updateAuthUi();
+  </script>
+</body>
+</html>
