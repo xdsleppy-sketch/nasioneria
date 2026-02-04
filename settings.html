@@ -171,6 +171,17 @@
       const user = requireUser();
       if (!user) return;
       webauthnStatus.textContent = "Uruchamianie Windows Hello...";
+      webauthnStatus.className = "status";
+      if (!window.isSecureContext) {
+        webauthnStatus.textContent = "Windows Hello wymaga HTTPS.";
+        webauthnStatus.className = "status error";
+        return;
+      }
+      if (!window.SimpleWebAuthnBrowser) {
+        webauthnStatus.textContent = "Brak wsparcia WebAuthn w przeglądarce.";
+        webauthnStatus.className = "status error";
+        return;
+      }
       try {
         const optionsRes = await fetch("/api/webauthn/register/options", {
           method: "POST",
@@ -190,7 +201,7 @@
         webauthnStatus.textContent = verifyData.message || "Windows Hello włączone.";
         webauthnStatus.className = verifyRes.ok ? "status success" : "status error";
       } catch (error) {
-        webauthnStatus.textContent = "Nie udało się włączyć Windows Hello.";
+        webauthnStatus.textContent = error?.message || "Nie udało się włączyć Windows Hello.";
         webauthnStatus.className = "status error";
       }
     });
