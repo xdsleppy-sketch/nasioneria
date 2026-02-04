@@ -96,7 +96,7 @@ initDb().catch((error) => {
 async function getUserByEmail(email) {
   if (!USE_DB) return users.get(email) || null;
   const { rows } = await pool.query(
-    "SELECT email, nick, password_hash, totp_secret, created_at FROM users WHERE email = $1",
+    "SELECT email, nick, password_hash, totp_secret, twofa_enabled, webauthn_enabled, webauthn_credential, webauthn_challenge, created_at FROM users WHERE email = $1",
     [email]
   );
   if (!rows[0]) return null;
