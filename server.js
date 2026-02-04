@@ -29,6 +29,10 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "";
 const DATABASE_URL = process.env.DATABASE_URL;
 const USE_DB = Boolean(DATABASE_URL);
 
+function toUserIdBuffer(email) {
+  return crypto.createHash("sha256").update(String(email)).digest();
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -362,7 +366,7 @@ app.post("/api/webauthn/register/options", async (req, res) => {
   const options = await generateRegistrationOptions({
     rpName: "Nasioneria",
     rpID: RP_ID,
-    userID: email,
+    userID: toUserIdBuffer(email),
     userName: email,
     userDisplayName: user.nick || email,
     attestationType: "none",
