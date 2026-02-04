@@ -183,7 +183,51 @@ function makeTransporter() {
 }
 
 const transporter = makeTransporter();
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const USE_BREVO = Boolean(BREVO_API_KEY);
 const LOG_FILE = path.join(__dirname, "logins.log");
+
+function parseMailFrom(value) {
+  if (!value) return { name: undefined, email: undefined };
+  const match = value.match(/^(.*)<([^>]+)>$/);
+  if (match) {
+    return { name: match[1].trim().replace(/^"|"$/g, ""), email: match[2].trim() };
+  }
+  return { name: undefined, email: value.trim() };
+}
+
+async function sendEmail({ to, subject, html }) {
+  const fallbackFrom = process.env.SMTP_USER || "no-reply@nasioneria.local";
+  const fromValue = process.env.MAIL_FROM || `Nasioneria <${fallbackFrom}>`;
+  const { name, email } = parseMailFrom(fromValue);
+
+  if (USE_BREVO) {
+    if (!email) throw new Error("Brak MAIL_FROM/BREVO sender email.");
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({
+        sender: { email, name: name || "Nasioneria" },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Brevo API error: ${res.status} ${text}`);
+    }
+    return;
+  }
+
+  if (!transporter) return;
+
+  return transporter.sendMail({ from: fromValue, to, subject, html });
+}
 
 function logLogin({ email, nick }) {
   const line = `${new Date().toISOString()} | ${email} | ${nick}\n`;
@@ -192,13 +236,11 @@ function logLogin({ email, nick }) {
 
 function sendVerificationEmail({ email, token }) {
   const verifyLink = `${BASE_URL}/verify?token=${token}`;
-  const from = process.env.MAIL_FROM || "Nasioneria <no-reply@nasioneria.local>";
-  if (!transporter) {
+  if (!transporter && !USE_BREVO) {
     console.log("[DEV] Brak konfiguracji SMTP. Link weryfikacyjny:", verifyLink);
     return Promise.resolve();
   }
-  return transporter.sendMail({
-    from,
+  return sendEmail({
     to: email,
     subject: "Potwierdź rejestrację — Nasioneria",
     html: `<p>Cześć!</p><p>Kliknij w link, aby potwierdzić rejestrację:</p><p><a href="${verifyLink}">${verifyLink}</a></p><p>Jeśli to nie Ty, zignoruj tę wiadomość.</p>`,
@@ -207,13 +249,11 @@ function sendVerificationEmail({ email, token }) {
 
 function sendResetEmail({ email, token }) {
   const resetLink = `${BASE_URL}/reset.html?token=${token}`;
-  const from = process.env.MAIL_FROM || "Nasioneria <no-reply@nasioneria.local>";
-  if (!transporter) {
+  if (!transporter && !USE_BREVO) {
     console.log("[DEV] Brak konfiguracji SMTP. Link resetu:", resetLink);
     return Promise.resolve();
   }
-  return transporter.sendMail({
-    from,
+  return sendEmail({
     to: email,
     subject: "Reset hasła — Nasioneria",
     html: `<p>Cześć!</p><p>Kliknij w link, aby zresetować hasło:</p><p><a href="${resetLink}">${resetLink}</a></p><p>Jeśli to nie Ty, zignoruj tę wiadomość.</p>`,
