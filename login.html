@@ -147,6 +147,7 @@
       loginState.webauthnEnabled = false;
       loginState.webauthnOptions = null;
       loginState.webauthnResponse = null;
+      if (webauthnButton) webauthnButton.disabled = true;
       token2faField?.setAttribute("hidden", "");
       webauthnField?.setAttribute("hidden", "");
       webauthnStatus.textContent = "";
@@ -158,7 +159,11 @@
     passwordInput?.addEventListener("input", resetLoginState);
 
     async function runWebauthn() {
-      if (!loginState.webauthnOptions) return null;
+      if (!loginState.webauthnOptions) {
+        webauthnStatus.textContent = "Najpierw zaloguj się hasłem, aby przygotować Windows Hello.";
+        webauthnStatus.className = "status error";
+        return null;
+      }
       try {
         webauthnStatus.textContent = "Oczekiwanie na potwierdzenie...";
         const response = await SimpleWebAuthnBrowser.startAuthentication(loginState.webauthnOptions);
@@ -208,6 +213,7 @@
 
           token2faField.toggleAttribute("hidden", !loginState.twofaEnabled);
           webauthnField.toggleAttribute("hidden", !loginState.webauthnEnabled);
+          if (webauthnButton) webauthnButton.disabled = !loginState.webauthnEnabled;
 
           if (!loginState.twofaEnabled && !loginState.webauthnEnabled) {
             loginForm.requestSubmit();
