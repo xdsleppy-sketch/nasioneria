@@ -473,6 +473,20 @@ app.post("/api/admin/clear-users", async (req, res) => {
   return res.json({ message: "Wyczyszczono wszystkie konta." });
 });
 
+app.post("/api/admin/webauthn/disable", async (req, res) => {
+  const key = req.headers["x-admin-key"] || req.body?.adminKey;
+  const adminEmail = req.body?.adminEmail || req.headers["x-admin-email"];
+  const targetEmail = req.body?.targetEmail;
+  if (!ADMIN_KEY || key !== ADMIN_KEY) return res.status(403).json({ message: "Brak uprawnień." });
+  if (ADMIN_EMAIL && String(adminEmail || "").toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    return res.status(403).json({ message: "Brak uprawnień." });
+  }
+  if (!targetEmail) return res.status(400).json({ message: "Brak e‑maila do wyłączenia." });
+
+  await updateUserFields(targetEmail, { webauthn_enabled: false, webauthn_credential: null, webauthn_challenge: null });
+  return res.json({ message: `Windows Hello wyłączone dla ${targetEmail}.` });
+});
+
 // ----------------------- REGISTER -----------------------
 app.post("/api/register", async (req, res) => {
   try {
