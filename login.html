@@ -49,7 +49,7 @@
     <section id="logowanie" class="section">
       <div class="section-header">
         <h2>Logowanie</h2>
-        <p>Podaj email, hasło i kod 2FA, aby zalogować się do sklepu.</p>
+        <p>Podaj email i hasło, aby zalogować się do sklepu.</p>
       </div>
       <p class="fine auth-message" id="authMessage" hidden></p>
       <form id="loginForm" class="form" autocomplete="on">
@@ -61,10 +61,16 @@
           Email
           <input type="email" name="email" placeholder="email@domena.pl" required />
         </label>
-        <label>
+        <label id="token2faField" hidden>
           Kod 2FA
-          <input type="text" name="token2FA" placeholder="6-cyfrowy kod" inputmode="numeric" autocomplete="one-time-code" required />
+          <input type="text" name="token2FA" placeholder="6-cyfrowy kod" inputmode="numeric" autocomplete="one-time-code" />
         </label>
+        <div id="webauthnField" class="card" hidden>
+          <h4>Windows Hello</h4>
+          <p class="fine">Zatwierdź logowanie w oknie systemu.</p>
+          <button class="btn ghost" type="button" id="webauthnButton">Użyj Windows Hello</button>
+          <p class="status" id="webauthnStatus" aria-live="polite"></p>
+        </div>
         <button class="btn" type="submit">Zaloguj się</button>
         <a class="fine" href="reset.html">Zapomniałem hasło</a>
         <p class="fine">Po zalogowaniu zobaczysz potwierdzenie.</p>
@@ -77,14 +83,29 @@
     <p>© 2026 Nasioneria — wszystkie prawa zastrzeżone.</p>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
   <script>
     const loginForm = document.getElementById("loginForm");
     const loginStatus = document.getElementById("loginStatus");
+    const token2faField = document.getElementById("token2faField");
+    const webauthnField = document.getElementById("webauthnField");
+    const webauthnButton = document.getElementById("webauthnButton");
+    const webauthnStatus = document.getElementById("webauthnStatus");
     const authGuest = document.querySelector(".auth-guest");
     const authUser = document.querySelector(".auth-user");
     const userNick = document.querySelector(".user-nick");
     const logoutBtn = document.querySelector(".logout-btn");
     const authMessage = document.getElementById("authMessage");
+
+    const loginState = {
+      prepared: false,
+      twofaEnabled: false,
+      webauthnEnabled: false,
+      webauthnOptions: null,
+      webauthnResponse: null,
+      email: "",
+      password: "",
+    };
 
     function getAuthUser() {
       try {
@@ -116,16 +137,88 @@
       updateAuthUi();
     });
 
+    async function runWebauthn() {
+      if (!loginState.webauthnOptions) return null;
+      try {
+        webauthnStatus.textContent = "Oczekiwanie na potwierdzenie...";
+        const response = await SimpleWebAuthnBrowser.startAuthentication(loginState.webauthnOptions);
+        loginState.webauthnResponse = response;
+        webauthnStatus.textContent = "Potwierdzenie zapisane.";
+        webauthnStatus.className = "status success";
+        return response;
+      } catch (error) {
+        webauthnStatus.textContent = "Windows Hello nieudane.";
+        webauthnStatus.className = "status error";
+        return null;
+      }
+    }
+
+    webauthnButton?.addEventListener("click", async () => {
+      await runWebauthn();
+    });
+
     loginForm?.addEventListener("submit", async (e) => {
       e.preventDefault();
       loginStatus.textContent = "";
 
       const form = new FormData(loginForm);
+      const email = String(form.get("email") || "");
+      const password = String(form.get("password") || "");
+
+      if (!loginState.prepared) {
+        try {
+          const res = await fetch("/api/login/prepare", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            loginStatus.textContent = data.message || "Błąd logowania.";
+            loginStatus.className = "status error";
+            return;
+          }
+
+          loginState.prepared = true;
+          loginState.twofaEnabled = !!data.twofaEnabled;
+          loginState.webauthnEnabled = !!data.webauthnEnabled;
+          loginState.webauthnOptions = data.webauthnOptions || null;
+          loginState.email = email;
+          loginState.password = password;
+
+          token2faField.toggleAttribute("hidden", !loginState.twofaEnabled);
+          webauthnField.toggleAttribute("hidden", !loginState.webauthnEnabled);
+
+          if (!loginState.twofaEnabled && !loginState.webauthnEnabled) {
+            loginForm.requestSubmit();
+            return;
+          }
+
+          loginStatus.textContent = "Wymagana dodatkowa weryfikacja.";
+          loginStatus.className = "status";
+          return;
+        } catch {
+          loginStatus.textContent = "Błąd połączenia z serwerem.";
+          loginStatus.className = "status error";
+          return;
+        }
+      }
+
       const payload = {
-        email: form.get("email"),
-        password: form.get("password"),
-        token2FA: form.get("token2FA"),
+        email: loginState.email || email,
+        password: loginState.password || password,
       };
+
+      if (loginState.twofaEnabled) {
+        payload.token2FA = form.get("token2FA");
+      }
+
+      if (loginState.webauthnEnabled) {
+        if (!loginState.webauthnResponse) {
+          await runWebauthn();
+        }
+        payload.webauthn = loginState.webauthnResponse;
+      }
 
       try {
         const res = await fetch("/api/login", {
@@ -140,6 +233,8 @@
           const nick = data.nick || payload.email;
           localStorage.setItem("authUser", JSON.stringify({ nick, email: payload.email }));
           updateAuthUi();
+          loginState.prepared = false;
+          loginState.webauthnResponse = null;
         }
       } catch {
         loginStatus.textContent = "Błąd połączenia z serwerem.";

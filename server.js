@@ -8,6 +8,13 @@ import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import speakeasy from "speakeasy";
 import qrcode from "qrcode";
+import {
+  generateAuthenticationOptions,
+  generateRegistrationOptions,
+  verifyAuthenticationResponse,
+  verifyRegistrationResponse,
+} from "@simplewebauthn/server";
+import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { Pool } from "pg";
 
 dotenv.config();
@@ -15,6 +22,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+const RP_ID = process.env.RP_ID || new URL(BASE_URL).hostname;
+const WEBAUTHN_ORIGIN = process.env.WEBAUTHN_ORIGIN || BASE_URL;
+const ADMIN_KEY = process.env.ADMIN_KEY || "";
 const DATABASE_URL = process.env.DATABASE_URL;
 const USE_DB = Boolean(DATABASE_URL);
 
@@ -45,6 +55,10 @@ async function initDb() {
       nick TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       totp_secret TEXT NOT NULL,
+      twofa_enabled BOOLEAN NOT NULL DEFAULT false,
+      webauthn_enabled BOOLEAN NOT NULL DEFAULT false,
+      webauthn_credential JSONB,
+      webauthn_challenge TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
@@ -64,6 +78,10 @@ async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS twofa_enabled BOOLEAN NOT NULL DEFAULT false;");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS webauthn_enabled BOOLEAN NOT NULL DEFAULT false;");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS webauthn_credential JSONB;");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS webauthn_challenge TEXT;");
 }
 
 initDb().catch((error) => {
@@ -82,13 +100,27 @@ async function getUserByEmail(email) {
     nick: rows[0].nick,
     passwordHash: rows[0].password_hash,
     totpSecret: rows[0].totp_secret,
+    twofaEnabled: rows[0].twofa_enabled ?? false,
+    webauthnEnabled: rows[0].webauthn_enabled ?? false,
+    webauthnCredential: rows[0].webauthn_credential || null,
+    webauthnChallenge: rows[0].webauthn_challenge || null,
     createdAt: rows[0].created_at,
   };
 }
 
 async function saveUser({ email, nick, passwordHash, totpSecret }) {
   if (!USE_DB) {
-    users.set(email, { email, nick, passwordHash, totpSecret, createdAt: Date.now() });
+    users.set(email, {
+      email,
+      nick,
+      passwordHash,
+      totpSecret,
+      twofaEnabled: false,
+      webauthnEnabled: false,
+      webauthnCredential: null,
+      webauthnChallenge: null,
+      createdAt: Date.now(),
+    });
     return;
   }
   await pool.query(
@@ -100,6 +132,33 @@ async function saveUser({ email, nick, passwordHash, totpSecret }) {
     `,
     [email, nick, passwordHash, totpSecret]
   );
+}
+
+async function updateUserFields(email, fields) {
+  const updates = Object.entries(fields).filter(([, value]) => value !== undefined);
+  if (!updates.length) return;
+
+  if (!USE_DB) {
+    const user = users.get(email);
+    if (!user) return;
+    const mapped = { ...fields };
+    if ("totp_secret" in mapped) mapped.totpSecret = mapped.totp_secret;
+    if ("twofa_enabled" in mapped) mapped.twofaEnabled = mapped.twofa_enabled;
+    if ("webauthn_enabled" in mapped) mapped.webauthnEnabled = mapped.webauthn_enabled;
+    if ("webauthn_credential" in mapped) mapped.webauthnCredential = mapped.webauthn_credential;
+    if ("webauthn_challenge" in mapped) mapped.webauthnChallenge = mapped.webauthn_challenge;
+    delete mapped.totp_secret;
+    delete mapped.twofa_enabled;
+    delete mapped.webauthn_enabled;
+    delete mapped.webauthn_credential;
+    delete mapped.webauthn_challenge;
+    users.set(email, { ...user, ...mapped });
+    return;
+  }
+
+  const setFragments = updates.map(([key], index) => `${key} = $${index + 2}`);
+  const values = updates.map(([, value]) => value);
+  await pool.query(`UPDATE users SET ${setFragments.join(", ")} WHERE email = $1`, [email, ...values]);
 }
 
 async function createPendingVerification({ token, nick, email, passwordHash }) {
@@ -260,6 +319,151 @@ function sendResetEmail({ email, token }) {
   });
 }
 
+// ----------------------- SECURITY SETTINGS -----------------------
+app.get("/api/auth/methods", async (req, res) => {
+  const { email } = req.query || {};
+  if (!email) return res.status(400).json({ message: "Brak e‑maila." });
+  const user = await getUserByEmail(String(email));
+  if (!user) return res.status(404).json({ message: "Nie znaleziono konta." });
+  return res.json({ twofaEnabled: !!user.twofaEnabled, webauthnEnabled: !!user.webauthnEnabled });
+});
+
+app.post("/api/2fa/setup", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ message: "Brak e‑maila." });
+  const user = await getUserByEmail(email);
+  if (!user) return res.status(404).json({ message: "Nie znaleziono konta." });
+
+  const totpSecret = user.totpSecret || speakeasy.generateSecret({ name: `Nasioneria (${user.nick || email})` }).base32;
+  await updateUserFields(email, { totp_secret: totpSecret, twofa_enabled: true });
+
+  const otpAuthUrl = speakeasy.otpauthURL({ secret: totpSecret, label: `Nasioneria (${user.nick || email})`, issuer: "Nasioneria" });
+  const qrCodeDataURL = await qrcode.toDataURL(otpAuthUrl);
+
+  return res.json({ message: "2FA włączone.", qrCodeDataURL, secret: totpSecret });
+});
+
+app.post("/api/2fa/disable", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ message: "Brak e‑maila." });
+  const user = await getUserByEmail(email);
+  if (!user) return res.status(404).json({ message: "Nie znaleziono konta." });
+  await updateUserFields(email, { twofa_enabled: false });
+  return res.json({ message: "2FA wyłączone." });
+});
+
+app.post("/api/webauthn/register/options", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ message: "Brak e‑maila." });
+  const user = await getUserByEmail(email);
+  if (!user) return res.status(404).json({ message: "Nie znaleziono konta." });
+
+  const options = await generateRegistrationOptions({
+    rpName: "Nasioneria",
+    rpID: RP_ID,
+    userID: email,
+    userName: email,
+    userDisplayName: user.nick || email,
+    attestationType: "none",
+    authenticatorSelection: {
+      userVerification: "required",
+    },
+  });
+
+  await updateUserFields(email, { webauthn_challenge: options.challenge });
+  return res.json(options);
+});
+
+app.post("/api/webauthn/register/verify", async (req, res) => {
+  const { email, response } = req.body || {};
+  if (!email || !response) return res.status(400).json({ message: "Brak danych rejestracji." });
+  const user = await getUserByEmail(email);
+  if (!user || !user.webauthnChallenge) return res.status(400).json({ message: "Brak wyzwania." });
+
+  const verification = await verifyRegistrationResponse({
+    response,
+    expectedChallenge: user.webauthnChallenge,
+    expectedOrigin: WEBAUTHN_ORIGIN,
+    expectedRPID: RP_ID,
+  });
+
+  if (!verification.verified || !verification.registrationInfo) {
+    return res.status(400).json({ message: "Nie udało się zweryfikować Windows Hello." });
+  }
+
+  const { credentialID, credentialPublicKey, counter, transports } = verification.registrationInfo;
+  const credential = {
+    id: isoBase64URL.fromBuffer(credentialID),
+    publicKey: isoBase64URL.fromBuffer(credentialPublicKey),
+    counter,
+    transports,
+  };
+
+  await updateUserFields(email, {
+    webauthn_enabled: true,
+    webauthn_credential: credential,
+    webauthn_challenge: null,
+  });
+
+  return res.json({ message: "Windows Hello włączone." });
+});
+
+app.post("/api/webauthn/disable", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ message: "Brak e‑maila." });
+  const user = await getUserByEmail(email);
+  if (!user) return res.status(404).json({ message: "Nie znaleziono konta." });
+  await updateUserFields(email, { webauthn_enabled: false, webauthn_credential: null, webauthn_challenge: null });
+  return res.json({ message: "Windows Hello wyłączone." });
+});
+
+app.post("/api/login/prepare", async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ message: "Podaj email i hasło." });
+  const user = await getUserByEmail(email);
+  if (!user) return res.status(401).json({ message: "Nieprawidłowe dane logowania lub brak weryfikacji." });
+
+  const ok = await bcrypt.compare(password, user.passwordHash);
+  if (!ok) return res.status(401).json({ message: "Nieprawidłowe dane logowania." });
+
+  let webauthnOptions = null;
+  if (user.webauthnEnabled && user.webauthnCredential?.id) {
+    webauthnOptions = await generateAuthenticationOptions({
+      rpID: RP_ID,
+      userVerification: "required",
+      allowCredentials: [
+        {
+          id: isoBase64URL.toBuffer(user.webauthnCredential.id),
+          type: "public-key",
+          transports: user.webauthnCredential.transports || ["internal"],
+        },
+      ],
+    });
+    await updateUserFields(email, { webauthn_challenge: webauthnOptions.challenge });
+  }
+
+  return res.json({
+    twofaEnabled: !!user.twofaEnabled,
+    webauthnEnabled: !!user.webauthnEnabled,
+    webauthnOptions,
+  });
+});
+
+app.post("/api/admin/clear-users", async (req, res) => {
+  const key = req.headers["x-admin-key"] || req.body?.adminKey;
+  if (!ADMIN_KEY || key !== ADMIN_KEY) return res.status(403).json({ message: "Brak uprawnień." });
+
+  if (!USE_DB) {
+    users.clear();
+    pending.clear();
+    resetTokens.clear();
+    return res.json({ message: "Wyczyszczono wszystkie konta (pamięć)." });
+  }
+
+  await pool.query("TRUNCATE TABLE users, pending_verifications, reset_tokens;");
+  return res.json({ message: "Wyczyszczono wszystkie konta." });
+});
+
 // ----------------------- REGISTER -----------------------
 app.post("/api/register", async (req, res) => {
   try {
@@ -339,7 +543,7 @@ app.get("/verify", async (req, res) => {
 
 // ----------------------- LOGIN -----------------------
 app.post("/api/login", async (req, res) => {
-  const { email, password, token2FA } = req.body || {};
+  const { email, password, token2FA, webauthn } = req.body || {};
   if (!email || !password) return res.status(400).json({ message: "Podaj email i hasło." });
 
   const user = await getUserByEmail(email);
@@ -349,14 +553,46 @@ app.post("/api/login", async (req, res) => {
   if (!ok) return res.status(401).json({ message: "Nieprawidłowe dane logowania." });
 
   // ----------------------- VERIFY 2FA -----------------------
-  if (!token2FA) return res.status(400).json({ message: "Wymagany kod 2FA." });
+  if (user.twofaEnabled) {
+    if (!token2FA) return res.status(400).json({ message: "Wymagany kod 2FA." });
+    const verified = speakeasy.totp.verify({
+      secret: user.totpSecret,
+      encoding: "base32",
+      token: token2FA,
+    });
+    if (!verified) return res.status(401).json({ message: "Nieprawidłowy kod 2FA." });
+  }
 
-  const verified = speakeasy.totp.verify({
-    secret: user.totpSecret,
-    encoding: "base32",
-    token: token2FA,
-  });
-  if (!verified) return res.status(401).json({ message: "Nieprawidłowy kod 2FA." });
+  // ----------------------- VERIFY WEBAUTHN -----------------------
+  if (user.webauthnEnabled) {
+    if (!webauthn) return res.status(400).json({ message: "Wymagana weryfikacja Windows Hello." });
+    if (!user.webauthnCredential || !user.webauthnChallenge) {
+      return res.status(400).json({ message: "Brak konfiguracji Windows Hello." });
+    }
+
+    const verification = await verifyAuthenticationResponse({
+      response: webauthn,
+      expectedChallenge: user.webauthnChallenge,
+      expectedOrigin: WEBAUTHN_ORIGIN,
+      expectedRPID: RP_ID,
+      authenticator: {
+        credentialID: isoBase64URL.toBuffer(user.webauthnCredential.id),
+        credentialPublicKey: isoBase64URL.toBuffer(user.webauthnCredential.publicKey),
+        counter: user.webauthnCredential.counter || 0,
+        transports: user.webauthnCredential.transports || ["internal"],
+      },
+    });
+
+    if (!verification.verified) return res.status(401).json({ message: "Windows Hello nieudane." });
+
+    await updateUserFields(email, {
+      webauthn_credential: {
+        ...user.webauthnCredential,
+        counter: verification.authenticationInfo?.newCounter ?? user.webauthnCredential.counter,
+      },
+      webauthn_challenge: null,
+    });
+  }
 
   logLogin({ email, nick: user.nick });
   return res.json({ message: `Zalogowano jako ${user.nick}.`, nick: user.nick });
