@@ -25,6 +25,7 @@ const BASE_URL = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || `htt
 const RP_ID = process.env.RP_ID || new URL(BASE_URL).hostname;
 const WEBAUTHN_ORIGIN = process.env.WEBAUTHN_ORIGIN || BASE_URL;
 const ADMIN_KEY = process.env.ADMIN_KEY || "";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "";
 const DATABASE_URL = process.env.DATABASE_URL;
 const USE_DB = Boolean(DATABASE_URL);
 
@@ -451,7 +452,11 @@ app.post("/api/login/prepare", async (req, res) => {
 
 app.post("/api/admin/clear-users", async (req, res) => {
   const key = req.headers["x-admin-key"] || req.body?.adminKey;
+  const email = req.body?.email || req.headers["x-admin-email"];
   if (!ADMIN_KEY || key !== ADMIN_KEY) return res.status(403).json({ message: "Brak uprawnień." });
+  if (ADMIN_EMAIL && String(email || "").toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    return res.status(403).json({ message: "Brak uprawnień." });
+  }
 
   if (!USE_DB) {
     users.clear();

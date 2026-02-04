@@ -63,7 +63,7 @@
         <p class="status" id="webauthnStatus" aria-live="polite"></p>
       </div>
 
-      <div class="card" id="admin">
+      <div class="card" id="admin" hidden>
         <h3>Administracja</h3>
         <p class="fine">Usunięcie wszystkich kont wymaga ADMIN_KEY.</p>
         <label>
@@ -92,6 +92,7 @@
     const enableWebauthn = document.getElementById("enableWebauthn");
     const disableWebauthn = document.getElementById("disableWebauthn");
     const webauthnStatus = document.getElementById("webauthnStatus");
+    const adminSection = document.getElementById("admin");
     const adminKey = document.getElementById("adminKey");
     const clearUsers = document.getElementById("clearUsers");
     const adminStatus = document.getElementById("adminStatus");
@@ -113,6 +114,8 @@
       }
       authMessage.textContent = `Zalogowany jako ${user.email || user.nick}.`;
       authMessage.removeAttribute("hidden");
+      const isAdmin = (user.email || "").toLowerCase() === "xdsleppy@gmail.com";
+      adminSection?.toggleAttribute("hidden", !isAdmin);
       return user;
     }
 
@@ -206,6 +209,13 @@
     });
 
     clearUsers?.addEventListener("click", async () => {
+      const user = requireUser();
+      if (!user) return;
+      if ((user.email || "").toLowerCase() !== "xdsleppy@gmail.com") {
+        adminStatus.textContent = "Brak uprawnień.";
+        adminStatus.className = "status error";
+        return;
+      }
       adminStatus.textContent = "Usuwanie kont...";
       const res = await fetch("/api/admin/clear-users", {
         method: "POST",
@@ -213,7 +223,7 @@
           "Content-Type": "application/json",
           "x-admin-key": adminKey.value || "",
         },
-        body: JSON.stringify({ adminKey: adminKey.value || "" }),
+        body: JSON.stringify({ adminKey: adminKey.value || "", email: user.email || "" }),
       });
       const data = await res.json();
       adminStatus.textContent = data.message || "Gotowe.";
