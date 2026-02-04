@@ -61,6 +61,14 @@
           Email
           <input type="email" name="email" placeholder="email@domena.pl" required />
         </label>
+        <div id="methodChooser" class="card" hidden>
+          <h4>Wybierz metodę weryfikacji</h4>
+          <div class="hero-cta">
+            <button class="btn ghost" type="button" id="choose2fa">Użyj 2FA</button>
+            <button class="btn ghost" type="button" id="chooseWebauthn">Użyj Windows Hello</button>
+          </div>
+          <p class="status" id="methodStatus" aria-live="polite"></p>
+        </div>
         <label id="token2faField" hidden>
           Kod 2FA
           <input type="text" name="token2FA" placeholder="6-cyfrowy kod" inputmode="numeric" autocomplete="one-time-code" />
@@ -87,6 +95,10 @@
   <script>
     const loginForm = document.getElementById("loginForm");
     const loginStatus = document.getElementById("loginStatus");
+    const methodChooser = document.getElementById("methodChooser");
+    const methodStatus = document.getElementById("methodStatus");
+    const choose2fa = document.getElementById("choose2fa");
+    const chooseWebauthn = document.getElementById("chooseWebauthn");
     const token2faField = document.getElementById("token2faField");
     const webauthnField = document.getElementById("webauthnField");
     const webauthnButton = document.getElementById("webauthnButton");
@@ -105,6 +117,7 @@
       webauthnEnabled: false,
       webauthnOptions: null,
       webauthnResponse: null,
+      authMethod: null,
       email: "",
       password: "",
     };
@@ -147,7 +160,10 @@
       loginState.webauthnEnabled = false;
       loginState.webauthnOptions = null;
       loginState.webauthnResponse = null;
+      loginState.authMethod = null;
       if (webauthnButton) webauthnButton.disabled = true;
+      methodChooser?.setAttribute("hidden", "");
+      methodStatus.textContent = "";
       token2faField?.setAttribute("hidden", "");
       webauthnField?.setAttribute("hidden", "");
       webauthnStatus.textContent = "";
@@ -182,6 +198,23 @@
       await runWebauthn();
     });
 
+    choose2fa?.addEventListener("click", () => {
+      loginState.authMethod = "2fa";
+      methodStatus.textContent = "Wybrano 2FA.";
+      methodStatus.className = "status";
+      token2faField?.removeAttribute("hidden");
+      webauthnField?.setAttribute("hidden", "");
+    });
+
+    chooseWebauthn?.addEventListener("click", () => {
+      loginState.authMethod = "webauthn";
+      methodStatus.textContent = "Wybrano Windows Hello.";
+      methodStatus.className = "status";
+      token2faField?.setAttribute("hidden", "");
+      webauthnField?.removeAttribute("hidden");
+      if (webauthnButton) webauthnButton.disabled = false;
+    });
+
     loginForm?.addEventListener("submit", async (e) => {
       e.preventDefault();
       loginStatus.textContent = "";
@@ -211,9 +244,19 @@
           loginState.email = email;
           loginState.password = password;
 
-          token2faField.toggleAttribute("hidden", !loginState.twofaEnabled);
-          webauthnField.toggleAttribute("hidden", !loginState.webauthnEnabled);
-          if (webauthnButton) webauthnButton.disabled = !loginState.webauthnEnabled;
+          const bothEnabled = loginState.twofaEnabled && loginState.webauthnEnabled;
+          if (bothEnabled) {
+            methodChooser?.removeAttribute("hidden");
+            token2faField?.setAttribute("hidden", "");
+            webauthnField?.setAttribute("hidden", "");
+            if (webauthnButton) webauthnButton.disabled = true;
+          } else {
+            methodChooser?.setAttribute("hidden", "");
+            token2faField.toggleAttribute("hidden", !loginState.twofaEnabled);
+            webauthnField.toggleAttribute("hidden", !loginState.webauthnEnabled);
+            if (webauthnButton) webauthnButton.disabled = !loginState.webauthnEnabled;
+            loginState.authMethod = loginState.webauthnEnabled ? "webauthn" : loginState.twofaEnabled ? "2fa" : null;
+          }
 
           if (!loginState.twofaEnabled && !loginState.webauthnEnabled) {
             loginForm.requestSubmit();
@@ -235,11 +278,21 @@
         password: loginState.password || password,
       };
 
-      if (loginState.twofaEnabled) {
+      if (loginState.twofaEnabled && loginState.webauthnEnabled && !loginState.authMethod) {
+        loginStatus.textContent = "Wybierz metodę weryfikacji.";
+        loginStatus.className = "status error";
+        return;
+      }
+
+      if (loginState.authMethod) {
+        payload.authMethod = loginState.authMethod;
+      }
+
+      if (loginState.twofaEnabled && loginState.authMethod === "2fa") {
         payload.token2FA = String(form.get("token2FA") || "").trim();
       }
 
-      if (loginState.webauthnEnabled) {
+      if (loginState.webauthnEnabled && loginState.authMethod === "webauthn") {
         if (!loginState.webauthnResponse) {
           const webauthnOk = await runWebauthn();
           if (!webauthnOk) {

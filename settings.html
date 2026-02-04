@@ -71,6 +71,11 @@
           <input type="password" id="adminKey" placeholder="ADMIN_KEY" />
         </label>
         <button class="btn ghost" type="button" id="clearUsers">Usuń wszystkie konta</button>
+        <label>
+          Wyłącz Windows Hello (email)
+          <input type="email" id="disableWebauthnEmail" placeholder="email@domena.pl" />
+        </label>
+        <button class="btn ghost" type="button" id="disableWebauthnAdmin">Wyłącz Windows Hello</button>
         <p class="status" id="adminStatus" aria-live="polite"></p>
       </div>
     </section>
@@ -95,6 +100,8 @@
     const adminSection = document.getElementById("admin");
     const adminKey = document.getElementById("adminKey");
     const clearUsers = document.getElementById("clearUsers");
+    const disableWebauthnEmail = document.getElementById("disableWebauthnEmail");
+    const disableWebauthnAdmin = document.getElementById("disableWebauthnAdmin");
     const adminStatus = document.getElementById("adminStatus");
 
     function getAuthUser() {
@@ -235,6 +242,38 @@
           "x-admin-key": adminKey.value || "",
         },
         body: JSON.stringify({ adminKey: adminKey.value || "", email: user.email || "" }),
+      });
+      const data = await res.json();
+      adminStatus.textContent = data.message || "Gotowe.";
+      adminStatus.className = res.ok ? "status success" : "status error";
+    });
+
+    disableWebauthnAdmin?.addEventListener("click", async () => {
+      const user = requireUser();
+      if (!user) return;
+      if ((user.email || "").toLowerCase() !== "xdsleppy@gmail.com") {
+        adminStatus.textContent = "Brak uprawnień.";
+        adminStatus.className = "status error";
+        return;
+      }
+      const targetEmail = String(disableWebauthnEmail.value || "").trim();
+      if (!targetEmail) {
+        adminStatus.textContent = "Podaj e‑mail.";
+        adminStatus.className = "status error";
+        return;
+      }
+      adminStatus.textContent = "Wyłączanie Windows Hello...";
+      const res = await fetch("/api/admin/webauthn/disable", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey.value || "",
+        },
+        body: JSON.stringify({
+          adminKey: adminKey.value || "",
+          adminEmail: user.email || "",
+          targetEmail,
+        }),
       });
       const data = await res.json();
       adminStatus.textContent = data.message || "Gotowe.";

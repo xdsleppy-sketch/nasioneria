@@ -340,7 +340,10 @@ app.post("/api/2fa/setup", async (req, res) => {
   if (!user) return res.status(404).json({ message: "Nie znaleziono konta." });
 
   const totpSecret = user.totpSecret || speakeasy.generateSecret({ name: `Nasioneria (${user.nick || email})` }).base32;
-  await updateUserFields(email, { totp_secret: totpSecret, twofa_enabled: true });
+  await updateUserFields(email, {
+    totp_secret: totpSecret,
+    twofa_enabled: true,
+  });
 
   const otpAuthUrl = speakeasy.otpauthURL({ secret: totpSecret, label: `Nasioneria (${user.nick || email})`, issuer: "Nasioneria" });
   const qrCodeDataURL = await qrcode.toDataURL(otpAuthUrl);
@@ -566,7 +569,7 @@ app.get("/verify", async (req, res) => {
 
 // ----------------------- LOGIN -----------------------
 app.post("/api/login", async (req, res) => {
-  const { email, password, token2FA, webauthn } = req.body || {};
+  const { email, password, token2FA, webauthn, authMethod } = req.body || {};
   if (!email || !password) return res.status(400).json({ message: "Podaj email i hasło." });
 
   const user = await getUserByEmail(email);
@@ -575,8 +578,17 @@ app.post("/api/login", async (req, res) => {
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return res.status(401).json({ message: "Nieprawidłowe dane logowania." });
 
+  const has2fa = !!user.twofaEnabled;
+  const hasWebauthn = !!user.webauthnEnabled;
+  const needsChoice = has2fa && hasWebauthn;
+
+  const selectedMethod = needsChoice ? authMethod : hasWebauthn ? "webauthn" : has2fa ? "2fa" : "none";
+  if (needsChoice && !selectedMethod) {
+    return res.status(400).json({ message: "Wybierz metodę weryfikacji." });
+  }
+
   // ----------------------- VERIFY 2FA -----------------------
-  if (user.twofaEnabled) {
+  if (selectedMethod === "2fa") {
     if (!token2FA) return res.status(400).json({ message: "Wymagany kod 2FA." });
     const verified = speakeasy.totp.verify({
       secret: user.totpSecret,
@@ -587,7 +599,7 @@ app.post("/api/login", async (req, res) => {
   }
 
   // ----------------------- VERIFY WEBAUTHN -----------------------
-  if (user.webauthnEnabled) {
+  if (selectedMethod === "webauthn") {
     if (!webauthn) return res.status(400).json({ message: "Wymagana weryfikacja Windows Hello." });
     if (!user.webauthnCredential || !user.webauthnChallenge) {
       return res.status(400).json({ message: "Brak konfiguracji Windows Hello." });
