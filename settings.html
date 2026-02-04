@@ -76,6 +76,11 @@
           <input type="email" id="disableWebauthnEmail" placeholder="email@domena.pl" />
         </label>
         <button class="btn ghost" type="button" id="disableWebauthnAdmin">Wyłącz Windows Hello</button>
+        <label>
+          Wyłącz 2FA (email)
+          <input type="email" id="disable2faEmail" placeholder="email@domena.pl" />
+        </label>
+        <button class="btn ghost" type="button" id="disable2faAdmin">Wyłącz 2FA</button>
         <p class="status" id="adminStatus" aria-live="polite"></p>
       </div>
     </section>
@@ -102,6 +107,8 @@
     const clearUsers = document.getElementById("clearUsers");
     const disableWebauthnEmail = document.getElementById("disableWebauthnEmail");
     const disableWebauthnAdmin = document.getElementById("disableWebauthnAdmin");
+    const disable2faEmail = document.getElementById("disable2faEmail");
+    const disable2faAdmin = document.getElementById("disable2faAdmin");
     const adminStatus = document.getElementById("adminStatus");
 
     function getAuthUser() {
@@ -264,6 +271,38 @@
       }
       adminStatus.textContent = "Wyłączanie Windows Hello...";
       const res = await fetch("/api/admin/webauthn/disable", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey.value || "",
+        },
+        body: JSON.stringify({
+          adminKey: adminKey.value || "",
+          adminEmail: user.email || "",
+          targetEmail,
+        }),
+      });
+      const data = await res.json();
+      adminStatus.textContent = data.message || "Gotowe.";
+      adminStatus.className = res.ok ? "status success" : "status error";
+    });
+
+    disable2faAdmin?.addEventListener("click", async () => {
+      const user = requireUser();
+      if (!user) return;
+      if ((user.email || "").toLowerCase() !== "xdsleppy@gmail.com") {
+        adminStatus.textContent = "Brak uprawnień.";
+        adminStatus.className = "status error";
+        return;
+      }
+      const targetEmail = String(disable2faEmail.value || "").trim();
+      if (!targetEmail) {
+        adminStatus.textContent = "Podaj e‑mail.";
+        adminStatus.className = "status error";
+        return;
+      }
+      adminStatus.textContent = "Wyłączanie 2FA...";
+      const res = await fetch("/api/admin/2fa/disable", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
