@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: nasioneria-web
+    env: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Ustaw BASE_URL w panelu Render (np. https://twoj-serwis.onrender.com)
