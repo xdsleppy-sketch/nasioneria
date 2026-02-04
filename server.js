@@ -32,7 +32,7 @@ const resetTokens = new Map(); // token -> { email, createdAt }
 const dbSsl = process.env.DATABASE_SSL === "true" || process.env.NODE_ENV === "production";
 const pool = USE_DB
   ? new Pool({
-      connectionString: "postgresql://nasioneria_user:YybnnaCVcs4RfkN7MHnT2iAJQ6hIavZA@dpg-d617u08nputs73a7478g-a/nasioneria",
+      connectionString: DATABASE_URL,
       ssl: dbSsl ? { rejectUnauthorized: false } : false,
     })
   : null;
@@ -222,25 +222,31 @@ function sendResetEmail({ email, token }) {
 
 // ----------------------- REGISTER -----------------------
 app.post("/api/register", async (req, res) => {
-  const { nick, email, password, confirmHuman } = req.body || {};
-
-  if (!nick || !email || !password) return res.status(400).json({ message: "Uzupełnij wszystkie pola." });
-  if (!confirmHuman) return res.status(400).json({ message: "Potwierdź, że nie jesteś botem." });
-  const existing = await getUserByEmail(email);
-  if (existing) return res.status(400).json({ message: "Konto z tym e‑mailem już istnieje." });
-
-  const passwordHash = await bcrypt.hash(password, 10);
-  const token = crypto.randomBytes(24).toString("hex");
-
-  await createPendingVerification({ token, nick, email, passwordHash });
-
   try {
-    await sendVerificationEmail({ email, token });
-    return res.json({ message: "Wysłano link weryfikacyjny na e‑mail." });
+    const { nick, email, password, confirmHuman } = req.body || {};
+
+    if (!nick || !email || !password) return res.status(400).json({ message: "Uzupełnij wszystkie pola." });
+    if (!confirmHuman) return res.status(400).json({ message: "Potwierdź, że nie jesteś botem." });
+
+    const existing = await getUserByEmail(email);
+    if (existing) return res.status(400).json({ message: "Konto z tym e‑mailem już istnieje." });
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const token = crypto.randomBytes(24).toString("hex");
+
+    await createPendingVerification({ token, nick, email, passwordHash });
+
+    try {
+      await sendVerificationEmail({ email, token });
+      return res.json({ message: "Wysłano link weryfikacyjny na e‑mail." });
+    } catch (error) {
+      await deletePendingVerification(token);
+      console.error("Błąd wysyłki e‑mail:", error?.message || error);
+      return res.status(500).json({ message: "Nie udało się wysłać maila. Sprawdź SMTP w .env." });
+    }
   } catch (error) {
-    await deletePendingVerification(token);
-    console.error("Błąd wysyłki e‑mail:", error?.message || error);
-    return res.status(500).json({ message: "Nie udało się wysłać maila. Sprawdź SMTP w .env." });
+    console.error("Błąd rejestracji:", error?.message || error);
+    return res.status(500).json({ message: "Błąd serwera podczas rejestracji." });
   }
 });
 
